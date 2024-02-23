@@ -19,6 +19,7 @@ describe("Elysia Flash Messages Plugin", () => {
 		const cookies = parseCookieJar(response);
 		expect(cookies[0].HttpOnly).toBe(true);
 		expect(cookies[0].Secure).toBe(true);
+		expect(cookies[0].Path).toBe("/");
 		expect(cookies[0]["Max-Age"]).toBe("30");
 		expect(JSON.parse(decodeURIComponent(cookies[0].flash as string))).toEqual({
 			success: ["Success message 1", "Success message 2"],

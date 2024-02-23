@@ -1,28 +1,47 @@
 import { Elysia } from "elysia";
 
-type Level = "info" | "success" | "warning" | "error";
+export type Level = "info" | "success" | "warning" | "error";
+export type FlashWriter = { add: (type: Level, message: string) => void };
+export type FlashReader = { get: (type: Level) => string[] };
+export type FlashWriterContext = { flash: FlashWriter };
+export type FlashReaderContext = { flash: FlashReader };
+export type FlashContext = { flash: FlashWriter & FlashReader };
+
+type Messages = { [K in Level]?: string[] };
+
+class Flash {
+	private readonly incoming: Messages;
+	private outgoing: Messages | undefined = undefined;
+
+	constructor(incoming: Messages) {
+		this.incoming = incoming ?? {};
+	}
+
+	get(type: Level) {
+		return this.incoming[type] ?? [];
+	}
+
+	add(type: Level, message: string) {
+		this.outgoing = this.outgoing ?? {};
+		this.outgoing[type] = [...(this.outgoing[type] ?? []), message];
+	}
+
+	outgoingMessages() {
+		return this.outgoing;
+	}
+}
 
 export const flashMessages = new Elysia({
 	name: "@gtramontina.com/elysia-flash-messages",
-}).derive(({ cookie: { flash } }) => {
-	const availableMessages = flash.value ?? {};
-	flash.remove();
-
-	const add = (type: Level, message: string) => {
-		const newMessages = flash.value ?? {};
-		newMessages[type] = [...(newMessages[type] ?? []), message];
-		flash.set({
-			maxAge: 30,
+})
+	.derive(({ cookie }) => ({ flash: new Flash(cookie.flash.value) }))
+	.mapResponse(({ cookie, flash }) => {
+		cookie.flash.set({
+			maxAge: flash.outgoingMessages() ? 30 : 0,
 			expires: undefined,
-			value: newMessages,
+			path: "/",
+			value: flash.outgoingMessages(),
 			secure: true,
 			httpOnly: true,
 		});
-	};
-
-	const get = (type: Level) => {
-		return availableMessages[type] ?? [];
-	};
-
-	return { flash: { get, add } };
-});
+	});
